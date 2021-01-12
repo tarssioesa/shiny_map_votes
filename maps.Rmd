@@ -1,0 +1,123 @@
+---
+title: "Mapas: Despesa contrada eleiçoes 2020"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    theme: journal
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shinyWidgets)
+library(tidyverse)
+library(plotly)
+library(shiny)
+library(scales)
+require(leaflet)
+
+
+load("df.RData")
+load("mun.RData")
+```
+
+Inputs {.sidebar}
+-------------------------------------
+
+```{r}
+
+pickerInput(
+  inputId = "state",
+  label = "Escolha o Estado desejado:",
+  choices = unique(df$SG_UF),
+  multiple = TRUE,
+  options = pickerOptions(
+    actionsBox = TRUE,
+    size = 10,
+    title  =  "-",
+    header = "Selecione uma opção"
+  )
+)
+
+pickerInput(
+   inputId = "cargo",
+   label = "Escolha o tipo de cargo:", 
+   choices = unique(df$DS_CARGO),
+   multiple = FALSE, 
+   options = pickerOptions(
+    actionsBox = TRUE,
+    size = 10,
+    title  =  "-",
+    header = "Selecione uma opção"
+  )
+)
+
+pickerInput(
+  inputId = "despesa",
+  label = "Escolha o tipo de despesa:",
+  choices = unique(df$DS_ORIGEM_DESPESA),
+  multiple = TRUE,
+  options = pickerOptions(
+    actionsBox = TRUE,
+    size = 10,
+    title  =  "-",
+    header = "Selecione uma opção"
+  )
+)
+
+sliderTextInput(
+   inputId = "valor",
+   label = "Filtre os valores pagos:", 
+   choices = c(0, 1, 10, 100, 1000, 10000, 100000, 1000000,
+               2000000),
+   selected = c(0, 2000000))
+
+```
+
+Column {.sidebar data-width=300}
+-------------------------------------
+
+### Valores Totais 
+
+```{r}
+
+
+df_modificado <- reactive({ 
+  
+df %>% 
+  filter(DS_CARGO %in% input$cargo) %>% 
+  filter(SG_UF %in% input$state) %>% 
+  filter(DS_ORIGEM_DESPESA == input$despesa) %>% 
+  filter(VR_DESPESA_CONTRATADA > min(input$valor), 
+         VR_DESPESA_CONTRATADA < max(input$valor))
+  
+})
+
+mun_reactive <- reactive({
+  
+mun %>% 
+  left_join(df_modificado())
+
+})
+
+renderLeaflet({
+  
+  mapa <- leaflet(data = mun_reactive())
+
+greens = colorNumeric("Greens", domain = 
+                        mun_reactive()$Total)
+
+mapa %>% 
+  addPolygons(weight = 0.1, fillColor = ~greens(Total),
+              color = "green",fillOpacity = 0.9,
+              smoothFactor = 0.5,
+              popup = paste0(mun$NM_UE,":  ",
+                             mun$Total)) %>%
+  addLegend(position = "bottomright", 
+            pal = greens,values = ~Total)
+
+  
+  
+})
+```
+
